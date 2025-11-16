@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Juego del Impostor</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background: #1a1a1a;
+        color: white;
+        padding: 20px;
+        max-width: 600px;
+        margin: auto;
+        font-size: 20px;
+    }
+    select, input, button {
+        font-size: 20px;
+        padding: 10px;
+        width: 100%;
+        margin-top: 10px;
+        border-radius: 8px;
+        border: none;
+    }
+    button {
+        background: #4caf50;
+        color: white;
+        font-weight: bold;
+    }
+    #gameArea {
+        margin-top: 20px;
+        padding: 20px;
+        background: #262626;
+        border-radius: 10px;
+        display: none;
+    }
+    .playerButton {
+        background: #2196f3;
+        margin-top: 10px;
+    }
+    #wordDisplay {
+        font-size: 26px;
+        text-align: center;
+        margin-top: 20px;
+        font-weight: bold;
+    }
+</style>
+</head>
+<body>
+<h2>Juego del Impostor</h2>
+
+<label>Categorías:</label>
+<select id="categorySelect" multiple size="8">
+</select>
+
+<label>Jugadores (separados por coma):</label>
+<input id="playersInput" placeholder="Ej: Juan, Ana, Pedro" />
+
+<label>Cantidad de impostores:</label>
+<input type="number" id="impostorCount" value="1" min="1" />
+
+<button onclick="crearJuego()">Crear Juego</button>
+
+<div id="gameArea">
+    <h3>Jugadores:</h3>
+    <div id="playerButtons"></div>
+    <div id="wordDisplay"></div>
+</div>
+
+<script>
+// *** BASE DE DATOS DE PALABRAS ***
+const categorias = {
+    "Videojuegos": [
+        "League of Legends", "Genshin Impact", "CSGO", "Clash Royale", "Clash of Clans", "Minecraft", "FIFA", "Fortnite", "Rocket League", "PUBG", "Call of Duty", "Brawl Stars", "Valorant", "Plants vs Zombies", "GTA V", "Red Dead Redemption 2"
+    ],
+    "Animales": [
+        "Perro", "Gato", "Caballo", "Tiburón", "Tortuga", "León", "Pez", "Mono", "Loro", "Vaca", "Oveja", "Puma"
+    ],
+    "Comidas": [
+        "Pizza", "Empanada", "Asado", "Milanesa", "Hamburguesa", "Fideos", "Taco", "Helado", "Sándwich", "Pancho", "Arepa"
+    ],
+    "Objetos": [
+        "Mesa", "Silla", "Celular", "Computadora", "Auto", "Lámpara", "Tijera", "Lápiz", "Pelota", "Cargador"
+    ],
+    "Trabajos": [
+        "Doctor", "Carpintero", "Profesor", "Policía", "Bombero", "Remisero", "Cocinero", "Ingeniero", "Electricista", "Mecánico"
+    ],
+    "Países": [
+        "Argentina", "Brasil", "Chile", "Uruguay", "México", "España", "Estados Unidos", "Canadá", "Japón", "Italia", "Francia"
+    ],
+    "Deportes": [
+        "Fútbol", "Básquet", "Tenis", "Vóley", "Natación", "Boxeo", "Rugby", "Hockey", "Gimnasia"
+    ],
+    "Escuela": [
+        "Pizarrón", "Banco", "Carpeta", "Cuaderno", "Tiza", "Mochila", "Directora", "Recreo", "Examen", "Proyector"
+    ]
+};
+
+// Agregar opción "Todas"
+window.onload = () => {
+    const sel = document.getElementById("categorySelect");
+    sel.innerHTML += `<option value="_todas">Todas las categorías</option>`;
+    for (let c in categorias) sel.innerHTML += `<option value="${c}">${c}</option>`;
+};
+
+let jugadores = [];
+let impostores = [];
+let palabraTripulante = "";
+let palabraImpostor = "";
+let indexActual = 0;
+let historyWords = [];
+
+function obtenerPalabraAleatoria(lista) {
+    let palabra;
+    let intentos = 0;
+
+    do {
+        palabra = lista[Math.floor(Math.random() * lista.length)];
+        intentos++;
+    } while ((historyWords.slice(-5).includes(palabra)) && intentos < 20);
+
+    historyWords.push(palabra);
+    return palabra;
+}
+
+function crearJuego() {
+    const seleccion = [...document.getElementById("categorySelect").selectedOptions].map(o => o.value);
+    if (seleccion.length === 0) return alert("Elegí al menos una categoría.");
+
+    let palabrasPool = [];
+    if (seleccion.includes("_todas")) {
+        for (let c in categorias) palabrasPool.push(...categorias[c]);
+    } else {
+        seleccion.forEach(c => palabrasPool.push(...categorias[c]));
+    }
+
+    const playersRaw = document.getElementById("playersInput").value.trim();
+    if (!playersRaw) return alert("Ingresá jugadores.");
+
+    jugadores = playersRaw.split(",").map(j => j.trim()).filter(j => j);
+
+    let cantImp = parseInt(document.getElementById("impostorCount").value);
+    if (cantImp >= jugadores.length) return alert("Los impostores no pueden ser todos.");
+
+    impostores = [];
+
+    while (impostores.length < cantImp) {
+        let r = jugadores[Math.floor(Math.random() * jugadores.length)];
+        if (!impostores.includes(r)) impostores.push(r);
+    }
+
+    palabraTripulante = obtenerPalabraAleatoria(palabrasPool);
+
+    do {
+        palabraImpostor = obtenerPalabraAleatoria(palabrasPool);
+    } while (palabraImpostor === palabraTripulante);
+
+    generarBotonesJugadores();
+
+    document.getElementById("gameArea").style.display = "block";
+    document.getElementById("wordDisplay").innerText = "";
+}
+
+function generarBotonesJugadores() {
+    const cont = document.getElementById("playerButtons");
+    cont.innerHTML = "";
+
+    indexActual = 0;
+
+    jugadores.forEach(j => {
+        const btn = document.createElement("button");
+        btn.className = "playerButton";
+        btn.textContent = j;
+
+        btn.onclick = () => mostrarPalabra(j);
+
+        cont.appendChild(btn);
+    });
+}
+
+function mostrarPalabra(jugador) {
+    if (jugador !== jugadores[indexActual]) return alert("No es tu turno aún.");
+
+    let palabra;
+    if (impostores.includes(jugador)) palabra = palabraImpostor;
+    else palabra = palabraTripulante;
+
+    const display = document.getElementById("wordDisplay");
+
+    if (display.innerText === "") {
+        display.innerText = palabra;
+    } else {
+        display.innerText = "";
+        indexActual = (indexActual + 1) % jugadores.length;
+    }
+}
+</script>
+</body>
+</html>
